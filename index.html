@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>キャッチコピージェネレーター</title>
+<meta name="description" content="対象とトーンを選ぶだけ。3本の短いキャッチコピーを自動生成。語感スコア付き＆縦長ポスター出力対応。単一HTMLのシングルページアプリ。"/>
+<style>
+  :root{
+    --bg: #0f1115;
+    --panel:#141822;
+    --panel-2:#171b25;
+    --text:#e8ecf2;
+    --muted:#a9b1c3;
+    --brand:#7aa2f7;
+    --accent:#9ece6a;
+    --hot:#ff8f8f;
+    --radius: 16px;
+    --shadow: 0 10px 30px rgba(0,0,0,.25);
+  }
+  html,body{height:100%;}
+  body{margin:0;background:radial-gradient(1200px 800px at 20% -10%,#27304a 0%,rgba(39,48,74,0) 40%),
+                      radial-gradient(900px 700px at 120% 10%,#2a2f3f 0%,rgba(39,48,74,0) 50%),
+                      linear-gradient(180deg,#0d1017 0%, #0b0e14 100%);
+       color:var(--text);
+       font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  }
+  .container{max-width:1100px;margin:24px auto;padding:0 20px;}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+  .logo{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#7aa2f7, #9ece6a);box-shadow:var(--shadow)}
+  .title{font-weight:800;letter-spacing:0.2px}
+  .subtitle{color:var(--muted);font-size:14px}
+
+  .grid{display:grid;grid-template-columns: 1.1fr .9fr; gap:20px}
+  @media (max-width:960px){.grid{grid-template-columns:1fr}} 
+
+  .card{background:linear-gradient(180deg,var(--panel) 0%, var(--panel-2) 100%);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+  .card h2{margin:0 0 10px 0;font-size:18px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  input[type="text"], select{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #252a37;background:#0f1320;color:var(--text);outline:none}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{padding:8px 12px;border-radius:999px;border:1px solid #2a2f3a;color:#cfd6e6;background:#101626;cursor:pointer;user-select:none;font-size:13px}
+  .chip.active{background:linear-gradient(135deg, #2a3756, #223149);border-color:#2e3e5d;color:#dfe8ff}
+
+  .btn{appearance:none;border:none;background:linear-gradient(135deg,#7aa2f7,#9ece6a);color:#0b0f19;padding:12px 14px;border-radius:12px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px rgba(122,162,247,.25);}
+  .btn.secondary{background:#1a2234;color:#dfe6fc;border:1px solid #2b3550;box-shadow:none}
+  .btn.ghost{background:transparent;border:1px solid #2a3247;color:#d4dbef}
+  .btn:active{transform:translateY(1px)}
+
+  .results{display:grid;grid-template-columns:1fr; gap:10px}
+  .copy-card{background:#0f1320;border:1px solid #27304a;border-radius:14px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:14px}
+  .copy-text{font-size:18px;line-height:1.6}
+  .actions{display:flex;gap:8px;align-items:center}
+  .score{display:flex; align-items:center; gap:8px}
+  .score-bar{width:120px;height:8px;background:#1a2133;border-radius:999px;overflow:hidden;border:1px solid #2a3552}
+  .score-fill{height:100%;background:linear-gradient(90deg,#7aa2f7,#9ece6a)}
+  .score b{font-size:12px}
+
+  .poster-card{position:sticky; top:16px}
+  .poster-wrap{background:#0f1320;border:1px solid #27304a;border-radius:16px;padding:12px}
+  .poster-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px 0}
+  .poster-area{display:grid;place-items:center;background:#0a0d15;border-radius:12px;padding:8px;border:1px dashed #2a3247}
+  /* Poster size: 1080 x 1350 (4:5 用) */
+  #poster{width:360px;height:450px; /* 1/3 表示 */
+          display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:10px;
+          border-radius:16px;position:relative;overflow:hidden;
+          background: linear-gradient(135deg,#151a26,#10131e);
+          color:#f4f7ff; padding:24px}
+  #poster .p-title{font-weight:800;font-size:28px;line-height:1.35;letter-spacing:.2px;word-break:keep-all}
+  #poster .p-sub{font-size:12px;color:#c6d0ea;opacity:.9}
+  #poster .wm{position:absolute;bottom:10px;right:14px;font-size:11px;color:#cbd5e9;opacity:.6}
+  .template-thumb{width:36px;height:36px;border-radius:10px;border:1px solid #2c3345;cursor:pointer}
+  .template-thumb[data-active="true"]{outline:2px solid #7aa2f7}
+  .switch{display:inline-flex;align-items:center;gap:6px}
+  .switch input{accent-color:#7aa2f7}
+  .help{color:#a9b1c3;font-size:13px}
+  .hint{font-size:12px;color:#9eacc9}
+  .footer{margin-top:14px;color:#8f99b3;font-size:12px}
+
+  .kbd{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; border:1px solid #2a3247;border-bottom-width:2px;padding:2px 6px;border-radius:6px;background:#0c101a;color:#cbd6ef}
+  /* Help dialog overrides for readability */
+  #helpDlg .card, #helpDlg h2, #helpDlg p, #helpDlg ol, #helpDlg li { color: var(--text); }
+  #helpDlg .help { color: var(--text); }
+  #helpDlg::backdrop{ background: rgba(0,0,0,.6); }
+  /* Help dialog overrides for readability */
+  #helpDlg .card, #helpDlg h2, #helpDlg p, #helpDlg ol, #helpDlg li { color: var(--text); }
+  #helpDlg .help { color: var(--text); }
+  #helpDlg::backdrop{ background: rgba(0,0,0,.6); }
+  /* Mobile readability: +8px padding in help dialog */
+  @media (max-width: 640px){
+    #helpDlg .card{ padding:24px; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.8 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3z" fill="#0b0f19"/></svg>
+      </div>
+      <div>
+        <div class="title">キャッチコピージェネレーター</div>
+        <div class="subtitle">対象とトーンを選ぶだけ。3本の短コピー＋語感スコア＋ポスター出力</div>
+      </div>
+      <div style="margin-left:auto">
+        <button class="btn ghost" id="helpBtn" aria-label="使い方">？ 使い方</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left: Controls & Results -->
+      <section class="card" aria-label="設定と結果">
+        <h2>1. 入力（30秒）</h2>
+        <div class="row">
+          <div style="flex:1">
+            <label for="targetType">対象の種類</label>
+            <select id="targetType">
+              <option>商品 / サービス</option>
+              <option>自分</option>
+              <option>イベント</option>
+              <option>お店 / ブランド</option>
+              <option>その他</option>
+            </select>
+          </div>
+          <div style="flex:2">
+            <label for="keywords">対象名やキーワード（例：やさしい紅茶 / 省エネアプリ）</label>
+            <input type="text" id="keywords" placeholder="例）やさしい紅茶、集中タイマー、イラストレーターshimarin など"/>
+          </div>
+        </div>
+        <div class="row">
+          <div style="flex:1">
+            <label>トーン（雰囲気）</label>
+            <div class="chips" id="toneChips" role="group" aria-label="トーン選択">
+              <!-- chips will be injected -->
+            </div>
+          </div>
+          <div style="flex:1">
+            <label>長さ</label>
+            <div class="chips" id="lenChips" role="group" aria-label="長さ選択">
+              <div class="chip active" data-len="short">短め</div>
+              <div class="chip" data-len="normal">ふつう</div>
+              <div class="chip" data-len="long">長め</div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn" id="genBtn">3本つくる</button>
+          <button class="btn secondary" id="shuffleBtn" title="単語の候補を入れ替え">リフレッシュ</button>
+        </div>
+
+        <h2 style="margin-top:18px">2. 結果（コピー×3）</h2>
+        <div id="results" class="results" aria-live="polite"></div>
+      </section>
+
+      <!-- Right: Poster Maker -->
+      <aside class="card poster-card" aria-label="ポスター作成">
+        <h2>3. ポスター出力</h2>
+        <div class="poster-wrap">
+          <div class="poster-toolbar">
+            <span class="hint">コピーを選んで→ポスターに反映</span>
+            <div class="switch"><input type="checkbox" id="showKw"><label for="showKw">小さくキーワードも表示</label></div>
+            <select id="templateSel" title="テンプレート">
+              <option value="grad-soft">淡いグラデ</option>
+              <option value="mono">モノクロ</option>
+              <option value="neon">ネオン</option>
+              <option value="pastel">やさかわ</option>
+            </select>
+            <select id="alignSel" title="配置">
+              <option value="center">中央</option>
+              <option value="left">左寄せ</option>
+            </select>
+            <input type="range" id="fontRange" min="18" max="42" value="28" title="文字サイズ"/>
+            <button class="btn" id="saveBtn">PNG保存</button>
+          </div>
+          <div class="poster-area">
+            <div id="poster" role="img" aria-label="ポスター">
+              <div class="p-title" id="pTitle">ここにコピーが入ります。</div>
+              <div class="p-sub" id="pSub" style="display:none"></div>
+              <div class="wm">#キャッチコピー工房</div>
+            </div>
+          </div>
+          <div class="help" style="margin-top:8px">SNSに合う 1080×1350px（4:5）で保存されます。</div>
+        </div>
+        <div class="footer">© 2025 Copy Studio. Made for creators.</div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Help Modal (simple) -->
+  <dialog id="helpDlg" style="border:none;border-radius:16px;padding:0;max-width:720px;width:92%">
+    <div class="card" style="margin:0">
+      <h2>使い方（かんたん3ステップ）</h2>
+      <ol style="line-height:2.1">
+        <li><b>対象</b>と<b>キーワード</b>を入れる（例：商品=やさしい紅茶）。</li>
+        <li><b>トーン</b>と<b>長さ</b>を選んで「3本つくる」。</li>
+        <li>好きなコピーの「ポスター」→<b>PNG保存</b>してSNSへ！</li>
+      </ol>
+      <p class="help">ヒント：<span class="kbd">Shift</span> を押しながら「リフレッシュ」で、少し攻めた表現になります。</p>
+      <div class="row" style="justify-content:flex-end"><button class="btn" id="closeHelp">OK</button></div>
+    </div>
+  </dialog>
+
+  <!-- html2canvas for poster export -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+  // ====== Tone Presets ======
+  const TONES = [
+    {id:'gentle', label:'やさしい'},
+    {id:'energetic', label:'元気'},
+    {id:'minimal', label:'ミニマル'},
+    {id:'luxury', label:'高級'},
+    {id:'kawaii', label:'かわいい'},
+    {id:'stoic', label:'ストイック'},
+    {id:'emo', label:'エモい'},
+    {id:'funny', label:'面白い'}
+  ];
+
+  const lexicons = {
+    gentle: {
+      mood:['そっと','ふわっと','やさしく','ほっと','ひだまりの'],
+      benefit:['こころほぐれる','毎日に寄りそう','深呼吸できる','肩の力がぬける','静かに満ちる'],
+      action:['落ち着く','包みこむ','和らげる','整える','寄り添う'],
+      motto:['無理しない。','好きにいこう。','今日に小さな余白を。','やさしさは強い。','深呼吸を、どうぞ。']
+    },
+    energetic: {
+      mood:['グッと','パッと','一瞬で','ガツンと','全開で'],
+      benefit:['やる気に点火','秒で切り替え','毎日をブースト','今すぐ加速','テンポ爆上げ'],
+      action:['駆け抜ける','跳ね上がる','キメる','盛り上げる','ブチ上げる'],
+      motto:['行こう、次の景色へ。','迷ったら前へ。','やるなら今。','最短、最高。','合図は、GO。']
+    },
+    minimal: {
+      mood:['静かに','凛と','余白と','ただ、','澄んだ'],
+      benefit:['本質だけ残す','ノイズを削る','余白で語る','軽やかに整う','無駄がない'],
+      action:['削ぎ落とす','整える','研ぐ','揃える','収める'],
+      motto:['少ないは、強い。','語らない、美しさ。','余白が、あなたを光らせる。','静けさは、贅沢。','ただ、いい。']
+    },
+    luxury: {
+      mood:['品よく','しっとり','格上げ','本物の','余裕のある'],
+      benefit:['手にするたび高揚','格をつくる','質で語る','長く愛せる','所作まで美しく'],
+      action:['格上げする','引き立てる','磨き上げる','纏う','満たす'],
+      motto:['上質は、日常に。','細部がすべて。','一段、上へ。','良いものと長く。','静かな自信。']
+    },
+    kawaii: {
+      mood:['きゅんと','まるっと','ふわふわ','ときめき','ちいさな'],
+      benefit:['毎日が色づく','気分があがる','写真が映える','持ってるだけで嬉しい','やさしくなれる'],
+      action:['集めたくなる','ぎゅっと抱きしめる','彩る','なじむ','きらめく'],
+      motto:['かわいさは正義。','毎日、きゅん補給。','すこしの無邪気を。','好きは、力。','笑顔、量産。']
+    },
+    stoic: {
+      mood:['研ぎ澄ます','無駄なく','黙々と','淡々と','ブレずに'],
+      benefit:['結果に集中','本質に届く','余計な手間ゼロ','軸がブレない','迷いが消える'],
+      action:['削る','積む','貫く','詰める','耐える'],
+      motto:['やる。以上。','静かに勝つ。','雑念、排除。','本質だけ。','弱音、置いてけ。']
+    },
+    emo: {
+      mood:['夜更けの','透明な','余韻の','ひそやかな','淡い'],
+      benefit:['心に残る','静かに沁みる','記憶がやさしい','明日が少し軽い','距離が近づく'],
+      action:['重ねる','ほどく','紡ぐ','溶かす','染みこむ'],
+      motto:['きみの一日が好きだ。','さみしさも連れていこう。','静かな熱。','言葉より手の温度。','やさしい夜に。']
+    },
+    funny: {
+      mood:['なんか良い','だいたいOK','秒でわかる','わりと天才','知らんけど'],
+      benefit:['ついツッコむ','記憶に残る','空気が和む','話のタネに','3割増しで好かれる'],
+      action:['盛る','オチる','ハネる','ツッコむ','ズラす'],
+      motto:['それはそう。','どうしてそうなった。','たぶん正解。','今日も平和。','はい、優勝。']
+    }
+  }
+
+  // ====== UI Boot ======
+  const toneChips = document.getElementById('toneChips');
+  TONES.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='chip'+(i===0?' active':'');
+    d.textContent=t.label; d.dataset.tone=t.id; toneChips.appendChild(d);
+  });
+
+  function setActiveChip(groupEl, clicked){
+    [...groupEl.children].forEach(c=>c.classList.remove('active'));
+    clicked.classList.add('active');
+  }
+  toneChips.addEventListener('click',e=>{
+    const chip=e.target.closest('.chip'); if(!chip) return; setActiveChip(toneChips, chip);
+  });
+  const lenChips=document.getElementById('lenChips');
+  lenChips.addEventListener('click',e=>{const chip=e.target.closest('.chip'); if(!chip) return; setActiveChip(lenChips, chip)});
+
+  // ====== Copy Generation ======
+  function pick(arr){return arr[Math.floor(Math.random()*arr.length)]}
+  function randChance(p){return Math.random()<p}
+
+  function makePieces(toneId,lenPref){
+    const L=lexicons[toneId];
+    const bonus = (lenPref==='long')? ['ゆっくり深呼吸','余白ごと連れて','静かな高揚','すっと晴れる'] : ['今すぐ','サクッと','ぱっと']
+    return {
+      mood: [...L.mood],
+      benefit: [...L.benefit, ... (lenPref!=='short'? bonus: [])],
+      action: [...L.action],
+      motto: [...L.motto]
+    }
+  }
+
+  function buildCopy(kw,toneId,lenPref,spicy=false){
+    kw = (kw||'').trim()||'あなたのいいモノ';
+    const P=makePieces(toneId,lenPref);
+    const forms = [
+      () => `${pick(P.mood)}、${kw}。`,
+      () => `${kw}、${pick(P.benefit)}。`,
+      () => `${kw}を${pick(P.action)}。`,
+      () => `${pick(P.mood)}${randChance(.4)?'・':''}${pick(P.benefit)}。`,
+      () => `${kw}、${pick(P.mood)}${randChance(.5)?'、':''}${pick(P.motto)}`,
+      () => `ただ、${kw}。`,
+      () => `${kw}は、${pick(P.benefit)}。`
+    ];
+    let text = pick(forms)();
+    // adjust length
+    const ideal = lenPref==='short'? 9 : lenPref==='long'? 16 : 12;
+    if (spicy && randChance(.6)) text = text.replace('。','！');
+    if (lenPref==='long' && text.length<ideal) text = text.replace('。', '、' + pick(P.motto));
+    if (lenPref==='short' && text.length>ideal+3) text = text.replace('、','。').replace('。','。');
+    // small style odds
+    if (randChance(.25)) text = text.replace('、','・');
+    if (randChance(.18)) text = text.replace('。','。');
+    return text;
+  }
+
+  // ====== Scoring (語感スコア) ======
+  function gokanScore(text,lenPref){
+    const len=text.replace(/[。、・\s]/g,'').length;
+    const ideal = lenPref==='short'? 9 : lenPref==='long'? 16 : 12;
+    let score = 50;
+    const lenDelta=Math.abs(len-ideal);
+    score += Math.max(0, 28 - 3*lenDelta);
+    const punch = (/[ッ!ー]/.test(text)?10:0) + (/[・、]/.test(text)?7:0);
+    score += punch;
+    const repeat = /(.)\1/.test(text)?8:0; score+=repeat;
+    const tidy = /^[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}A-Za-z0-9ー・、。!\s]+$/u.test(text)?7:0; score+=tidy;
+    return Math.min(99, Math.max(40, Math.round(score)));
+  }
+
+  function scoreExplain(text,lenPref){
+    const len=text.replace(/[。、・\s]/g,'').length;
+    const ideal = lenPref==='short'? 9 : lenPref==='long'? 16 : 12;
+    const hasPunch = /[ッ!ー]/.test(text);
+    const hasBreak = /[・、]/.test(text);
+    const hasRepeat= /(.)\1/.test(text);
+    return `長さ: ${len}（理想${ideal}) / 音の強さ: ${hasPunch?'あり':'ふつう'} / リズム: ${hasBreak?'区切りあり':'単文'} / 反復: ${hasRepeat?'あり':'なし'}`
+  }
+
+  // ====== Render Results ======
+  const resultsEl = document.getElementById('results');
+  function renderResults(list,lenPref){
+    resultsEl.innerHTML='';
+    list.forEach(t=>{
+      const sc=gokanScore(t,lenPref);
+      const wrap=document.createElement('div'); wrap.className='copy-card';
+      const left=document.createElement('div'); left.className='copy-text'; left.textContent=t;
+      const right=document.createElement('div'); right.className='actions';
+      const score=document.createElement('div'); score.className='score';
+      const bar=document.createElement('div'); bar.className='score-bar';
+      const fill=document.createElement('div'); fill.className='score-fill'; fill.style.width=sc+'%';
+      const label=document.createElement('b'); label.textContent=sc+'/100';
+      bar.appendChild(fill); score.appendChild(bar); score.appendChild(label); score.title=scoreExplain(t,lenPref);
+      const btn1=document.createElement('button'); btn1.className='btn secondary'; btn1.textContent='コピー';
+      btn1.addEventListener('click',()=>{navigator.clipboard.writeText(t); btn1.textContent='コピー済み'; setTimeout(()=>btn1.textContent='コピー',1200)});
+      const btn2=document.createElement('button'); btn2.className='btn'; btn2.textContent='ポスター';
+      btn2.addEventListener('click',()=>applyToPoster(t));
+      right.append(score, btn1, btn2);
+      wrap.append(left,right);
+      resultsEl.appendChild(wrap);
+    })
+  }
+
+  // ====== Poster ======
+  const poster = document.getElementById('poster');
+  const pTitle = document.getElementById('pTitle');
+  const pSub = document.getElementById('pSub');
+  const showKw = document.getElementById('showKw');
+  const templateSel = document.getElementById('templateSel');
+  const alignSel = document.getElementById('alignSel');
+  const fontRange = document.getElementById('fontRange');
+
+  function applyToPoster(text){
+    pTitle.textContent = text;
+    const kw = (document.getElementById('keywords').value.trim())
+    pSub.textContent = kw;
+    pSub.style.display = (showKw.checked && kw)?'block':'none';
+  }
+
+  function setTemplate(name){
+    const bg = {
+      'grad-soft': 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
+      'mono': 'linear-gradient(135deg, #111318 0%, #0b0e14 100%)',
+      'neon': 'radial-gradient(800px 500px at -10% -10%, #3b82f6 0%, rgba(59,130,246,0) 40%), radial-gradient(900px 600px at 110% 10%, #22d3ee 0%, rgba(34,211,238,0) 40%), linear-gradient(135deg,#0b1020,#0a0f1b)',
+      'pastel': 'linear-gradient(135deg, #f5c8ea, #bde6ff 50%, #bff0d0)'
+    }[name]||'linear-gradient(135deg, #334155, #0f172a)';
+    poster.style.background = bg;
+    poster.style.color = (name==='pastel')? '#112' : '#f4f7ff';
+  }
+  setTemplate('grad-soft');
+
+  templateSel.addEventListener('change', e=> setTemplate(e.target.value));
+  alignSel.addEventListener('change', e=>{
+    const v=e.target.value;
+    poster.style.textAlign = (v==='left')? 'left':'center';
+    poster.style.alignItems = (v==='left')? 'flex-start':'center';
+  });
+  fontRange.addEventListener('input', e=>{pTitle.style.fontSize = e.target.value + 'px'});
+  showKw.addEventListener('change', ()=>{
+    const kw=document.getElementById('keywords').value.trim();
+    pSub.textContent=kw; pSub.style.display=(showKw.checked && kw)?'block':'none';
+  })
+
+  document.getElementById('saveBtn').addEventListener('click', async ()=>{
+    // temporarily render at 1080 x 1350 by scaling
+    const temp = poster.cloneNode(true);
+    temp.style.width='1080px'; temp.style.height='1350px'; temp.style.fontSize = (parseFloat(getComputedStyle(pTitle).fontSize)*3)+'px';
+    temp.style.position='absolute'; temp.style.left='-9999px'; temp.style.top='0';
+    document.body.appendChild(temp);
+    await html2canvas(temp,{backgroundColor:null, scale:1}).then(canvas=>{
+      const link=document.createElement('a'); link.download='copy-poster.png'; link.href=canvas.toDataURL('image/png'); link.click();
+    }).finally(()=>{
+      document.body.removeChild(temp);
+    })
+  })
+
+  // ====== Generate Button ======
+  const genBtn=document.getElementById('genBtn');
+  const shuffleBtn=document.getElementById('shuffleBtn');
+  function currentTone(){
+    const active=toneChips.querySelector('.chip.active');
+    return active?active.dataset.tone:'gentle';
+  }
+  function currentLen(){
+    const active=lenChips.querySelector('.chip.active');
+    return active?active.dataset.len:'normal';
+  }
+
+  function generate(spicy=false){
+    const tone=currentTone();
+    const lenPref=currentLen();
+    const kw=document.getElementById('keywords').value.trim();
+    const copies=[buildCopy(kw,tone,lenPref,spicy), buildCopy(kw,tone,lenPref,spicy), buildCopy(kw,tone,lenPref,spicy)];
+    renderResults(copies,lenPref);
+    applyToPoster(copies[0]);
+  }
+  genBtn.addEventListener('click',()=>generate(false));
+  shuffleBtn.addEventListener('click', (e)=>generate(e.shiftKey));
+
+  // ====== Help ======
+  const helpBtn=document.getElementById('helpBtn');
+  const helpDlg=document.getElementById('helpDlg');
+  const closeHelp=document.getElementById('closeHelp');
+  helpBtn.addEventListener('click',()=>helpDlg.showModal());
+  closeHelp.addEventListener('click',()=>helpDlg.close());
+
+  // First paint
+  generate();
+  </script>
+</body>
+</html>
